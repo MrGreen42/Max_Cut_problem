@@ -1,17 +1,28 @@
 # Max_Cut_problem
-Solver for MAX-CUT problem with Ising model using algorithm described in https://arxiv.org/pdf/1810.12565. It is a test task
 
-I didn't have time to finish it, i know this code need much refactoring, especialy about optimization, documentation, testing and error handling. Also results of algorithm on benchmark GSET doesnt match to reference values. So right now this code mainly only represents idea of algorithm.
+Solver for the **MAX-CUT problem** with Ising model using the algorithm described in [arXiv:1810.12565](https://arxiv.org/pdf/1810.12565).
 
-to build:
-    cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DUSE_OPENMP=ON
-    make -j$(nproc)
+## Status
 
-to run:
-    ./bin/test_max_cut
-        or
-    ./bin/test_graph_loader
-        or
-    ./bin/Max_Cut_problem_cli
+I didn't have time to finish it. I know this code needs significant refactoring, especially regarding:
+- Optimization
+- Documentation
+- Testing
+- Error handling
 
+Also, results of the algorithm on the GSET benchmark don't yet match reference values. So right now, this code mainly represents the core idea of the algorithm.
 
+## Build
+
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DUSE_OPENMP=ON
+make -j$(nproc)
+
+# Run solver tests
+./bin/test_max_cut
+
+# Run graph loader tests
+./bin/test_graph_loader
+
+# Run CLI solver
+./bin/Max_Cut_problem_cli
