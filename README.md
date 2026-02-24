@@ -18,6 +18,8 @@ Also, results of the algorithm on the GSET benchmark don't yet match reference v
 cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DUSE_OPENMP=ON
 make -j$(nproc)
 
+## Run
+
 # Run solver tests
 ./bin/test_max_cut
 
