@@ -12,14 +12,6 @@ I didn't have time to finish it. I know this code needs significant refactoring,
 
 Also, results of the algorithm on the GSET benchmark don't yet match reference values. So right now, this code mainly represents the core idea of the algorithm.
 
-## Build
-
-```bash
-cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DUSE_OPENMP=ON
-make -j$(nproc)
-
-## Run
-
 # Run solver tests
 ./bin/test_max_cut
 
@@ -28,3 +20,10 @@ make -j$(nproc)
 
 # Run CLI solver
 ./bin/Max_Cut_problem_cli
+
+## Build
+
+```bash
+cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=ON -DUSE_OPENMP=ON
+make -j$(nproc)
+
