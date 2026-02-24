@@ -29,4 +29,6 @@ public:
     int getSolution() {return best_maxcut;};
     Solver(const SolverConfig& config, const graph_loader::Graph& graph_) : solver_config(config), graph(graph_) {}
 };
+
+SolverConfig create_solver_config(const graph_loader::Graph& graph);
 } // namespace max_cut_solver

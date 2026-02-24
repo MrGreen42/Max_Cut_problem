@@ -1,6 +1,10 @@
 #include "max_cut_solver.hpp"
 #include <cmath>
 #include <random>
+#include <Eigen/Dense>
+#include <Eigen/Eigenvalues>
+#include <omp.h>
+#include <iostream>
 
 namespace max_cut_solver {
 
@@ -12,15 +16,15 @@ void Solver::solve() {
     double p_value = solver_config.pi;
     double a_value = solver_config.alpha;
     double beta_value = 0.0;
-    int curr_cut = 0; // TODO: подумать почему не оценка снизу для данной задачи
+    int curr_cut = 0;
     double time_last_improve = 0.0;
     int number_vert = graph.getVerticeNumber();
     std::vector<double> hamilt(number_vert);
 
     std::vector<double> x_values(number_vert);
-    std::random_device rd;  // Источник энтропии ОС
-    std::mt19937 rng(rd()); // Генератор без фиксированного seed
-    std::normal_distribution<double> dist(0.0, 0.2);
+    std::random_device rd;
+    std::mt19937 rng(rd());
+    std::normal_distribution<double> dist(0.0, 0.5);
     
     for (int i = 0; i < number_vert; ++i) {
         x_values[i] = dist(rng);
@@ -29,33 +33,45 @@ void Solver::solve() {
     std::vector<double> e_values(number_vert, 1.0);
     std::vector<int> sigma(number_vert);
     double time = 0.0;
+    
     while (time < solver_config.t_max) {
+        //std::cout << time << " of " << solver_config.t_max << std::endl;
+        #pragma omp parallel for schedule(static)
         for (int i = 0; i < number_vert; ++i) {
-            hamilt[i] = 0.0;
+            double sum = 0.0;
             for (int j = 0; j < number_vert; ++j) {
-                hamilt[i] += x_values[j] * graph.getValueIJ(i, j);
+                sum += x_values[j] * graph.getValueIJ(i, j);
             }
-        }
-        for (int i = 0; i < number_vert; ++i) {
-            x_values[i] += solver_config.dt * ((p_value - 1) * x_values[i] -
-            x_values[i] * x_values[i] * x_values[i] +
-            solver_config.epsilon * e_values[i] * hamilt[i]);
+            hamilt[i] = sum;
         }
 
+        #pragma omp parallel for schedule(static)
         for (int i = 0; i < number_vert; ++i) {
-            e_values[i] += solver_config.dt * (-beta_value *
-                (x_values[i] * x_values[i] - a_value) * e_values[i]);
+            x_values[i] += solver_config.dt * (
+                (p_value - 1.0) * x_values[i] -
+                x_values[i] * x_values[i] * x_values[i] +
+                solver_config.epsilon * e_values[i] * hamilt[i]
+            );
         }
 
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < number_vert; ++i) {
+            e_values[i] += solver_config.dt * (
+                -beta_value * (x_values[i] * x_values[i] - a_value) * e_values[i]
+            );
+        }
+
+        #pragma omp parallel for schedule(static)
         for (int i = 0; i < number_vert; ++i) {
             sigma[i] = sgn(x_values[i]);
         }
 
         curr_cut = 0;
+        #pragma omp parallel for reduction(+:curr_cut) schedule(static)
         for (int i = 0; i < number_vert; ++i) {
-            for (int j = i+1; j < number_vert; ++j) {
-                if (graph.getValueIJ(i,j) != 0 && sigma[i] != sigma[j]) {
-                    curr_cut += graph.getValueIJ(i,j);
+            for (int j = i + 1; j < number_vert; ++j) {
+                if (graph.getValueIJ(i, j) != 0.0 && sigma[i] != sigma[j]) {
+                    curr_cut += static_cast<int>(graph.getValueIJ(i, j));
                 }
             }
         }
@@ -64,20 +80,70 @@ void Solver::solve() {
             best_maxcut = curr_cut;
             best_solution = sigma;
             time_last_improve = time;
+            std::cout << " new best result " << best_maxcut << std::endl;
         }
-        double delta_C = best_maxcut - curr_cut;
-        double phi = std::tanh(solver_config.delta * delta_C); // написать tanh самим, чтобы не подключать библиотеку
+        
+        double delta_C = static_cast<double>(best_maxcut - curr_cut);
+        double phi = std::tanh(solver_config.delta * delta_C);
         a_value = solver_config.alpha - solver_config.rho * phi;
         p_value = solver_config.pi + solver_config.rho * phi;
 
         if (time - time_last_improve < solver_config.tau) {
             beta_value += solver_config.gamma * solver_config.dt;
-        }
-        else {
+        } else {
             beta_value = 0.0;
             time_last_improve = time;
         }
+        
         time += solver_config.dt;
     }
+}
+
+SolverConfig create_solver_config(const graph_loader::Graph& graph) {
+    SolverConfig cfg;
+    const int N = graph.getVerticeNumber();
+    
+    double sum_weights = 0.0;
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            sum_weights += std::abs(graph.getValueIJ(i, j));
+        }
+    }
+    double avg_sum = sum_weights / N;
+    cfg.epsilon = (avg_sum > 1e-12) ? 3.0 / avg_sum : 0.07;
+    
+    Eigen::MatrixXd Omega = Eigen::MatrixXd::Zero(N, N);
+    for (int i = 0; i < N; ++i) {
+        for (int j = 0; j < N; ++j) {
+            Omega(i, j) = graph.getValueIJ(i, j);
+        }
+    }
+    
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(Omega);
+    if (solver.info() != Eigen::Success) {
+        throw std::runtime_error("Eigenvalue computation failed");
+    }
+    
+    Eigen::VectorXd evals = solver.eigenvalues();
+    
+    double nu1 = evals(N - 1);
+    double nu2 = evals(N - 2);
+    double nu3 = evals(N - 3);
+    double nu4 = evals(N - 4);
+    
+    double g_val = -6.3674 - 0.2579 * nu1 - 1.0548 * nu2 
+           - 4.2597 * nu3 + 6.1727 * nu4;;
+    cfg.pi = 1.0 - cfg.epsilon * g_val;
+    
+    cfg.alpha = 1.0;
+    cfg.rho = 1.0;
+    cfg.delta = 7.0;
+    cfg.gamma = 0.065 / N;
+    cfg.tau = 7.0 * N;
+    
+    cfg.dt = 0.05;
+    cfg.t_max = 5.0 * cfg.tau;
+    
+    return cfg;
 }
 } // namespace max_cut_solver

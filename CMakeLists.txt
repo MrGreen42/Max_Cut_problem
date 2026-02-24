@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 option(BUILD_TESTS "Build unit tests" ON)
 option(USE_OPENMP "Enable OpenMP parallelism" ON)
 
+find_package(Eigen3 3.4 REQUIRED NO_MODULE)
+
 add_library(Max_Cut_problem STATIC
     src/max_cut_solver.cpp
     src/graph_loader.cpp
@@ -15,6 +17,8 @@ add_library(Max_Cut_problem STATIC
 target_include_directories(Max_Cut_problem PUBLIC 
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+target_link_libraries(Max_Cut_problem PUBLIC Eigen3::Eigen)
 
 if(USE_OPENMP)
     find_package(OpenMP REQUIRED)
@@ -51,3 +55,4 @@ if(BUILD_TESTS)
 endif()
 
 file(COPY ${CMAKE_SOURCE_DIR}/test_data DESTINATION ${CMAKE_BINARY_DIR})
+file(COPY ${CMAKE_SOURCE_DIR}/gset_data DESTINATION ${CMAKE_BINARY_DIR})
