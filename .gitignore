@@ -83,3 +83,8 @@ build/bin/test_graph_loader
 build/test_data/invalid_graph.txt
 build/test_data/small_graph.txt
 build/test_data/tiny_graph.txt
+build/gset_data/G1.txt
+.vscode/c_cpp_properties.json
+.vscode/settings.json
+.gitignore
+build/gset_data/G2.txt
