@@ -24,6 +24,7 @@ void Solver::solve() {
     std::vector<double> hamilt(number_vert);
 
     std::vector<double> x_values(number_vert);
+    std::vector<double> delta_x(number_vert);
     std::random_device rd;
     std::mt19937 rng(rd());
     std::normal_distribution<double> dist(0.0, 0.1);
@@ -48,7 +49,7 @@ void Solver::solve() {
 
         #pragma omp parallel for schedule(static)
         for (int i = 0; i < number_vert; ++i) {
-            x_values[i] += solver_config.dt * (
+            delta_x[i] = solver_config.dt * (
                 (p_value - 1.0) * x_values[i] -
                 x_values[i] * x_values[i] * x_values[i] +
                 solver_config.epsilon * e_values[i] * hamilt[i]
@@ -60,6 +61,14 @@ void Solver::solve() {
             e_values[i] += solver_config.dt * (
                 -beta_value * (x_values[i] * x_values[i] - a_value) * e_values[i]
             );
+        }
+        if (std::isnan(e_values[0])) {
+            break;
+        }
+
+        #pragma omp parallel for schedule(static)
+        for (int i = 0; i < number_vert; ++i) {
+            x_values[i] -= delta_x[i];
         }
 
         #pragma omp parallel for schedule(static)
@@ -85,6 +94,7 @@ void Solver::solve() {
         
         double delta_C = static_cast<double>(best_maxcut - curr_cut);
         double phi = std::tanh(solver_config.delta * delta_C);
+
         a_value = solver_config.alpha - solver_config.rho * phi;
         p_value = solver_config.pi + solver_config.rho * phi;
 
@@ -94,7 +104,6 @@ void Solver::solve() {
             beta_value = 0.0;
             time_last_improve = time;
         }
-        
         time += solver_config.dt;
     }
 }
@@ -103,13 +112,14 @@ SolverConfig create_solver_config(const graph_loader::Graph& graph) {
     SolverConfig cfg;
     const int N = graph.getVerticeNumber();
 
-    double sum_weights = 0.0;
+    double avg_sum = 0.0;
     for (int i = 0; i < N; ++i) {
+        double sum_weights = 0.0;
         for (int j = 0; j < N; ++j) {
             sum_weights += std::abs(graph.getValueIJ(i, j));
         }
+        avg_sum += sum_weights / N;
     }
-    double avg_sum = sum_weights / N;
     cfg.epsilon = 3.0 / avg_sum;
     
     Eigen::MatrixXd Omega = Eigen::MatrixXd::Zero(N, N);
